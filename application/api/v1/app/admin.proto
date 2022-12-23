@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package admin.service.v1;
+
+enum Error {
+  OK = 0;
+  ACCOUNT_NOT_EXIST = 1;
+  SERVER_FAULT = 20;
+}
+
+message Account {
+  string uid = 1;
+  string name = 2;
+  string phone = 3;
+  string remark = 4;
+}
+
+message GetAccountByPhoneReq {
+  string phone = 1;
+}
+
+message GetAccountByPhoneReply {
+  Error err = 1;
+  Account account = 2;
+}
+
+message GetAccountByUIDReq {
+  string uid = 1;
+}
+
+message GetAccountByUIDReply {
+  Error err = 1;
+  Account account = 2;
+}
+
+message ListCompaniesByUidReq{
+  repeated string uid = 1;
+}
+
+message ListCompaniesReq {
+}
+
+message CompanyConfig{
+  message AlgConfig{
+    string inventory = 1;
+  }
+  AlgConfig algConfig = 1;
+}
+
+message Company {
+  string uid = 1;
+  string name = 2;
+  repeated string modules = 3;
+  int64 expired = 4 ;
+  CompanyConfig config = 5;
+}
+
+message ListCompaniesReply {
+  Error err = 1;
+  repeated Company companies = 2;
+}
+
+service Admin {
+  rpc GetAccountByPhone (GetAccountByPhoneReq) returns (GetAccountByPhoneReply) {
+  }
+
+  rpc GetAccountByUID (GetAccountByUIDReq) returns (GetAccountByUIDReply) {
+  }
+
+  rpc ListCompanies (ListCompaniesReq) returns (ListCompaniesReply) {
+  }
+
+  rpc ListCompaniesByUIDs (ListCompaniesByUidReq) returns (ListCompaniesReply) {
+  }
+}
