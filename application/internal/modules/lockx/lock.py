@@ -1,43 +1,43 @@
-from enum import Enum, unique
 import typing as t
-import logging
-import traceback
+from six.moves import queue
 
-from application.internal.modules import redisx
+from zope.interface import Interface
+
 from application.internal.modules.utils import NoException
 
 
-@unique
-class LockCli(Enum):
-    REDIS = 0
-    ETCD = 1
+class ILock(Interface):
+    """Distributed lock interface"""
+
+    def init(self, name: str, ttl: int = 60):
+        """对象池模式重新初始化对象"""
+
+    def acquire(self) -> bool:
+        """acquire lock"""
+
+    def release(self):
+        """release lock"""
+
+    def is_acquired(self) -> bool:
+        """is acquired lock"""
 
 
-lock_cli_map: t.Optional[t.Dict[LockCli, t.Any]] = {}
-
-
-def new_lock_cli_map(_lock_cli_map):
-    return _lock_cli_map
-
-
-# TODO: 处理成接口模式, 使用对象池模式
 class Lock:
     """"""
     def __init__(
             self,
-            name: str,
-            ttl: int = 60,
-            lockType: LockCli = LockCli.REDIS
+            cli: ILock,
+            name: t.Optional[str] = None,
+            ttl: int = 60
     ):
         """
         初始化分布式锁, 目前可选择redis和etcd
         注: with 上下文模式慎用, 如果是大量线程同时获取锁的时候, 会不断的加锁 -> 释放锁, 因为退出with的时候会自动释放锁
+        :param cli: 锁客户端
         :param name: lock name
         :param ttl: lock expired, seconds
-        :param lockType: 分布式锁的类型
         """
-        self._cli = redisx.redis.lock(name, ttl) if not lock_cli_map.get(lockType) \
-            else lock_cli_map.get(lockType).lock(name, ttl)
+        self._cli = cli
         self._name = name
         self._ttl = ttl
 
@@ -48,6 +48,17 @@ class Lock:
     @property
     def ttl(self):
         return self._ttl
+
+    @name.setter
+    def name(self, _name: str):
+        self._name = _name
+
+    @ttl.setter
+    def ttl(self, _ttl: int):
+        self._ttl = _ttl
+
+    def init(self, name: str, ttl: int = 60):
+        self._cli.init(name, ttl)
 
     @NoException()
     def acquire(self) -> bool:
@@ -76,3 +87,16 @@ class Lock:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.release()
+
+
+class LockPool:
+    """lock对象池"""
+    def __init__(self, pool: int, timeout: int = 5):
+        self._pool = queue.Queue(pool)
+        self._timeout = timeout
+
+    def get(self):
+        return self._pool.get(timeout=self._timeout)
+
+    def put(self, lock_cli: Lock):
+        self._pool.put(lock_cli, timeout=self._timeout)

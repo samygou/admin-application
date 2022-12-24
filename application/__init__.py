@@ -212,13 +212,10 @@ def _register_registration_center(app: FlaskX):
     # registration.cli.register('admin-application-registration-test2', 'http://127.0.0.1:30003')
 
 
-def _register_distributed_lock(app: FlaskX):
-    _lock_cli_map = {
-        lockx.LockCli.REDIS: redisx.redis,
-        lockx.LockCli.ETCD: etcdx.cli
-    }
-
-    lockx.lock.lock_cli_map = lockx.new_lock_cli_map(_lock_cli_map)
+def _register_distributed_lock(app: FlaskX, pool: int = 10):
+    lockx.lock_pool = lockx.LockPool(pool)
+    for _ in range(pool):
+        lockx.lock_pool.put(lockx.Lock(redisx.Lock(client=redisx.redis)))
 
 
 def _register_new_modules(app: FlaskX):

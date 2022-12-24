@@ -1,15 +1,17 @@
+import typing as t
+
 from . import lock
 
 
 __all__ = [
     'Lock',
-    'LockCli',
-
-    'new_lock_cli_map'
+    'ILock',
+    'LockPool',
 ]
 
 
 Lock = lock.Lock
-LockCli = lock.LockCli
+ILock = lock.ILock
+LockPool = lock.LockPool
 
-new_lock_cli_map = lock.new_lock_cli_map
+lock_pool: t.Optional[LockPool] = None

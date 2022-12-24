@@ -10,6 +10,7 @@ from zope.interface import implementer
 from application.internal.modules.utils import Singleton
 from application.internal.modules import apscheduler
 from application.internal.modules import registration
+from application.internal.modules import lockx
 
 
 @unique
@@ -313,6 +314,12 @@ def new_client(
     return Client(host=host, port=port, grpc_options=grpc_options)
 
 
+@implementer(lockx.ILock)
+class Lock:
+    """etcd lock"""
+    # TODO: 实现ILock定义的接口
+
+
 @implementer(registration.IRegistration)
 class Registration(Singleton):
     """注册中心"""
@@ -365,4 +372,14 @@ class Registration(Singleton):
                 del self.lease_info[key]
 
 
+class Watch:
+    """watch client"""
+    def __init__(self, cli: Client):
+        """init"""
+        self._cli = cli
 
+    def watch(self, key: str, prefix_key: bool = False, **kwargs):
+        """"""
+
+    def cancel(self):
+        """"""

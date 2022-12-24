@@ -4,8 +4,10 @@ import threading
 import uuid
 
 from flask_redis import FlaskRedis
+from zope.interface import implementer
 
 from application.internal.modules.utils import Singleton
+from application.internal.modules import lockx
 
 
 _MAX_CONNECTIONS = 20
@@ -54,27 +56,33 @@ class Client(Singleton):
         :param expired:
         :return:
         """
-        return _Lock(lock_name, ttl=expired, client=self)
+        return Lock(lock_name, ttl=expired, client=self)
 
 
-class _Lock:
+@implementer(lockx.ILock)
+class Lock:
     """分布式锁"""
 
     def __init__(
             self,
-            name: str,
+            name: str = None,
             ttl: int = 60,
             client: t.Optional[Client] = None
     ):
         """
 
-        :param name:
-        :param ttl:
+        :param name: name设置为可选值, 为了使用对象池模式
+        :param ttl: 锁超时时间
         """
         self._name = name
         self._val = uuid.uuid4().bytes
         self._ttl = ttl
         self.redis_cli = client
+
+    def init(self, name: str, ttl: int = 60):
+        self._name = name
+        self._ttl = ttl
+        self._val = uuid.uuid4().bytes
 
     def acquire(self):
         if self.redis_cli.cli.set(self._name, self._val, ex=self._ttl, nx=True):

@@ -269,7 +269,8 @@ class CacheSession:
 
                 return cache_data
             else:
-                lock = lockx.Lock(lock_name, lockExpired)
+                lock = lockx.lock_pool.get()
+                lock.init(name=lock_name, ttl=lockExpired)
                 if lock.acquire():
                     logging.info('acquire lock, get data from db')
                     origin_req = copy.deepcopy(req)
@@ -295,10 +296,12 @@ class CacheSession:
 
                     # 5. 删除锁
                     lock.release()
+                    lockx.lock_pool.put(lock)
 
                     return data[origin_req.pl.offset:origin_req.pl.offset + origin_req.pl.size]
 
             time.sleep(0.0001)
+            lockx.lock_pool.put(lock)
             logging.info('wait cache update...')
 
         return None
