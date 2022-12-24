@@ -4,7 +4,7 @@ import logging
 import traceback
 
 from application.internal.modules import redisx
-from application.internal.modules.utils import Singleton, NoException
+from application.internal.modules.utils import NoException
 
 
 @unique
@@ -20,7 +20,8 @@ def new_lock_cli_map(_lock_cli_map):
     return _lock_cli_map
 
 
-class Lock(Singleton):
+# TODO: 处理成接口模式, 使用对象池模式
+class Lock:
     """"""
     def __init__(
             self,
@@ -35,10 +36,10 @@ class Lock(Singleton):
         :param ttl: lock expired, seconds
         :param lockType: 分布式锁的类型
         """
-        self._cli = redisx.redis if not lock_cli_map.get(lockType) else lock_cli_map.get(lockType)
+        self._cli = redisx.redis.lock(name, ttl) if not lock_cli_map.get(lockType) \
+            else lock_cli_map.get(lockType).lock(name, ttl)
         self._name = name
         self._ttl = ttl
-        self._lock = self._cli.lock(name, ttl)
 
     @property
     def name(self):
@@ -54,7 +55,7 @@ class Lock(Singleton):
         acquire lock, etcd retry raise Exception, catch it and do not raise
         :return:
         """
-        return self._lock.acquire()
+        return self._cli.acquire()
 
     @NoException()
     def release(self):
@@ -62,12 +63,12 @@ class Lock(Singleton):
         release lock
         :return:
         """
-        self._lock.release()
+        self._cli.release()
 
     @NoException()
     def is_acquired(self) -> bool:
         """判断是否是自己家的锁"""
-        return self._lock.is_acquired()
+        return self._cli.is_acquired()
 
     def __enter__(self):
         self.acquire()

@@ -6,6 +6,7 @@ import uuid
 import copy
 import logging
 from enum import Enum, unique
+import random
 
 from pydantic import BaseModel
 
@@ -268,14 +269,14 @@ class CacheSession:
 
                 return cache_data
             else:
-                lock = lockx.Lock(lock_name, lockExpired, lockx.LockCli.ETCD)
+                lock = lockx.Lock(lock_name, lockExpired)
                 if lock.acquire():
                     logging.info('acquire lock, get data from db')
                     origin_req = copy.deepcopy(req)
                     # 从数据库中获取默认获取前1w条数据
                     req.pl = self.process_db_page_limit(req.pl)
                     data = get_cache_from_db_func(req)
-                    cache_expired = cacheExpired if data else 5 * 60
+                    cache_expired = cacheExpired + random.randint(0, 300) if data else 5 * 60
 
                     # 4. 更新缓存
                     logging.info('update cache...')
@@ -290,7 +291,7 @@ class CacheSession:
                     logging.info('cache update success')
 
                     # 睡眠1毫秒, 防止删除锁的一瞬间, 刚好有请求判断锁不存在, 重新更新缓存
-                    time.sleep(0.0001)
+                    time.sleep(0.001)
 
                     # 5. 删除锁
                     lock.release()

@@ -1,4 +1,4 @@
-from zope.interface.declarations import implementer
+from zope.interface import implementer
 
 from application.internal.biz import ICompanyRepo
 

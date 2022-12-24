@@ -1,17 +1,26 @@
 import logging
 import typing as t
 from enum import Enum, unique
+import threading
 
 import etcd3
+from pydantic import BaseModel
+from zope.interface import implementer
 
 from application.internal.modules.utils import Singleton
 from application.internal.modules import apscheduler
+from application.internal.modules import registration
 
 
 @unique
 class EtcdConnType(Enum):
     HTTP = 0
     GRPC = 1
+
+
+class TTLOptions(BaseModel):
+    heartBeat: int
+    ttl: int
 
 
 class Client(Singleton):
@@ -51,6 +60,7 @@ class Client(Singleton):
         self._grpc_options = grpc_options
         self._cli: t.Optional[etcd3.client] = None
         self._lease_info: t.Optional[t.Dict] = {}
+        self._lock = threading.Lock()
 
     def conn(self, typ: EtcdConnType):
         if typ == EtcdConnType.HTTP:
@@ -236,7 +246,8 @@ class Client(Singleton):
             apscheduler.cli.remove_job(job_id)
 
             # 2. 删除lease_info
-            del self._lease_info[lease_id]
+            with self._lock:
+                del self._lease_info[lease_id]
 
         return self._cli.revoke_lease(lease_id)
 
@@ -262,7 +273,9 @@ class Client(Singleton):
         :return:
         """
         job_id = f'registration-center-{lease_id}-keepalive'
-        self._lease_info[lease_id] = job_id
+
+        with self._lock:
+            self._lease_info[lease_id] = job_id
 
         # 添加一个定时器, keepalive lease
         apscheduler.cli.add_job(
@@ -288,6 +301,9 @@ class Client(Singleton):
         """
         return self._cli.lock(name, ttl=ttl)
 
+    def registration(self, ttlOptions: t.Optional[TTLOptions] = None):
+        return Registration(cli=self, ttlOptions=ttlOptions)
+
 
 def new_client(
         host: str = 'localhost',
@@ -295,3 +311,58 @@ def new_client(
         grpc_options=None
 ) -> Client:
     return Client(host=host, port=port, grpc_options=grpc_options)
+
+
+@implementer(registration.IRegistration)
+class Registration(Singleton):
+    """注册中心"""
+    def __init__(self, cli: Client, ttlOptions: t.Optional[TTLOptions] = None):
+        """"""
+        self._cli = cli
+        self._ttl_options = ttlOptions if ttlOptions else TTLOptions(heartBeat=5, ttl=10)
+        self._lock = threading.Lock()
+        self.lease_info: t.Optional[t.Dict] = {}
+
+    def register(self, key: str, value: t.Any) -> bool:
+        """
+
+        :param key:
+        :param value:
+        :return:
+        """
+        if not key or not value:
+            return False
+
+        lease = self._cli.lease(self._ttl_options.ttl)
+        lease_id = lease.id
+
+        prev_kv = self._cli.put(key, value, lease=lease)
+        logging.debug(f'prev_kv: {prev_kv}')
+
+        with self._lock:
+            self.lease_info[key] = lease
+
+        self._cli.lease_keepalive(lease_id, self._ttl_options.heartBeat)
+
+        logging.info('registration ok')
+
+        return True
+
+    def deregister(self, key: str):
+        if not key:
+            return
+
+        self._cli.delete(key)
+
+        lease = self.lease_info.get(key, None)
+
+        if lease:
+            # 1. 停止lease
+            self._cli.revoke_lease(lease.id)
+
+            # 3. 删除 key
+            with self._lock:
+                del self.lease_info[key]
+
+
+

@@ -32,7 +32,7 @@ from application.internal.modules.utils import Singleton
 from application.internal.modules import redisx
 from application.internal.modules import logx
 from application.internal.modules import etcdx
-from application.internal.modules import register
+from application.internal.modules import registration
 from application.internal.modules import lockx
 
 
@@ -69,43 +69,12 @@ class FlaskX(Flask):
 
 
 def _configure_logger(app: FlaskX):
-    # log_path = pathlib.Path(os.path.join(settings.BASE_DIR, 'logs')).as_posix()
-    # if not os.path.isdir(log_path):
-    #     os.makedirs(log_path)
-    #
-    # log_file_path = pathlib.Path(os.path.join(log_path, 'admin_application.log')).as_posix()
-
-    # delete default log format
     app.logger.removeHandler(default_handler)
 
     logx.Logger(
         pathlib.Path(os.path.join(settings.BASE_DIR, 'logs')).as_posix(),
         'admin_application.log'
     ).init()
-
-    # file_handler = logging.handlers.RotatingFileHandler(
-    #     filename=log_file_path,
-    #     maxBytes=20 * 1024 * 1024,
-    #     backupCount=30
-    # )
-    #
-    # logging_format = logging. \
-    #     Formatter('[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] [%(funcName)s] - %(message)s')
-    #
-    # file_handler.setFormatter(logging_format)
-    #
-    # stream_handler = logging.StreamHandler()
-    # stream_handler.setFormatter(logging_format)
-    #
-    # app.logger.setLevel(logging.INFO)
-    #
-    # for logger in (
-    #     app.logger,
-    #     logging.getLogger('sqlalchemy'),
-    #     logging.getLogger('werkzeug')
-    # ):
-    #     logger.addHandler(file_handler)
-    #     logger.addHandler(stream_handler)
 
 
 def _configure_handlers(app: FlaskX):
@@ -237,9 +206,10 @@ def _register_etcd(app: FlaskX):
 
 
 def _register_registration_center(app: FlaskX):
-    register.cli = register.new_client(etcdx.cli)
+    registration.cli = registration.new_client(etcdx.cli.registration())
 
-    # register.cli.register('admin-application-register-test2', 'http://127.0.0.1:30003')
+    # 测试etcd的注册功能
+    # registration.cli.register('admin-application-registration-test2', 'http://127.0.0.1:30003')
 
 
 def _register_distributed_lock(app: FlaskX):

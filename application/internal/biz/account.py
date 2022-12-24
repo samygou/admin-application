@@ -64,7 +64,7 @@ class AccountUseCase:
                 'cell phone number is not exactly'
             )
 
-        if req.type not in ['login', 'register']:
+        if req.type not in ['login', 'registration']:
             raise APIException(
                 ExceptionCode.INVALID_PARAMS_CODE,
                 'invalid_parameter',

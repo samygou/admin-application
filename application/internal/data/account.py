@@ -2,7 +2,7 @@ import logging
 import time
 import typing as t
 
-from zope.interface.declarations import implementer
+from zope.interface import implementer
 from flask import current_app
 
 from .. import biz
