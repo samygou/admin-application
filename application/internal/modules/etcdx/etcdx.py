@@ -24,6 +24,10 @@ class TTLOptions(BaseModel):
     ttl: int
 
 
+class ETCDLockNotInitException(Exception):
+    """etcd lock not init."""
+
+
 class Client(Singleton):
     """etcd client"""
     def __init__(
@@ -59,13 +63,13 @@ class Client(Singleton):
         self._user = user
         self._password = password
         self._grpc_options = grpc_options
-        self._cli: t.Optional[etcd3.client] = None
+        self.cli: t.Optional[etcd3.client] = None
         self._lease_info: t.Optional[t.Dict] = {}
         self._lock = threading.Lock()
 
     def conn(self, typ: EtcdConnType):
         if typ == EtcdConnType.HTTP:
-            self._cli = etcd3.client(
+            self.cli = etcd3.client(
                 host=self._host,
                 port=self._port,
                 ca_cert=self._ca_cert,
@@ -76,7 +80,7 @@ class Client(Singleton):
                 password=self._password
             )
         elif typ == EtcdConnType.GRPC:
-            self._cli = etcd3.client(
+            self.cli = etcd3.client(
                 ca_cert=self._ca_cert,
                 cert_key=self._cert_key,
                 cert_cert=self._cert_cert,
@@ -86,7 +90,7 @@ class Client(Singleton):
                 grpc_options=self._grpc_options
             )
         else:
-            self._cli = etcd3.client(
+            self.cli = etcd3.client(
                 host=self._host,
                 port=self._port,
                 ca_cert=self._ca_cert,
@@ -98,10 +102,10 @@ class Client(Singleton):
             )
 
     def close(self):
-        self._cli.close()
+        self.cli.close()
 
     def get(self, key: str):
-        return self._cli.get(key)
+        return self.cli.get(key)
 
     def get_prefix(self, key_prefix: str, **kwargs) -> t.Tuple:
         """
@@ -111,7 +115,7 @@ class Client(Singleton):
 
         :returns: sequence of (value, metadata) tuples
         """
-        return self._cli.get_prefix(key_prefix, **kwargs)
+        return self.cli.get_prefix(key_prefix, **kwargs)
 
     def get_range(self, range_start: str, range_end: str, **kwargs):
         """
@@ -121,7 +125,7 @@ class Client(Singleton):
         :param range_end: last key in range
         :returns: sequence of (value, metadata) tuples
         """
-        return self._cli.get_range(range_start, range_end, **kwargs)
+        return self.cli.get_range(range_start, range_end, **kwargs)
 
     def put(self, key, value, lease=None, prev_kv=False):
         """
@@ -145,7 +149,7 @@ class Client(Singleton):
         :returns: a response containing a header and the prev_kv
         :rtype: :class:`.rpc_pb2.PutResponse`
         """
-        return self._cli.put(key, value, lease=lease, prev_kv=prev_kv)
+        return self.cli.put(key, value, lease=lease, prev_kv=prev_kv)
 
     def put_nx(self, key, value, lease=None) -> bool:
         """
@@ -163,7 +167,7 @@ class Client(Singleton):
                   ``False`` otherwise
         :rtype: bool
         """
-        return self._cli.put_if_not_exists(key, value, lease=lease)
+        return self.cli.put_if_not_exists(key, value, lease=lease)
 
     def replace(self, key: str, initial_value, new_value) -> bool:
         """
@@ -182,7 +186,7 @@ class Client(Singleton):
                   successful, ``False`` otherwise
         :rtype: bool
         """
-        return self._cli.replace(key, initial_value, new_value)
+        return self.cli.replace(key, initial_value, new_value)
 
     def delete(self, key, prev_kv=False, return_response=False) -> bool:
         """
@@ -198,11 +202,11 @@ class Client(Singleton):
                   a header, the number of deleted keys and prev_kvs when
                   ``return_response`` is True
         """
-        return self._cli.delete(key, prev_kv=prev_kv, return_response=return_response)
+        return self.cli.delete(key, prev_kv=prev_kv, return_response=return_response)
 
     def status(self):
         """Get the status of the responding member."""
-        return self._cli.status()
+        return self.cli.status()
 
     def watch(self, key: str, prefix_key=False, **kwargs):
         """
@@ -215,9 +219,9 @@ class Client(Singleton):
         :returns: tuple of ``events_iterator`` and ``cancel``.
         """
         if prefix_key:
-            return self._cli.watch_prefix(key, **kwargs)
+            return self.cli.watch_prefix(key, **kwargs)
 
-        return self._cli.watch(key, **kwargs)
+        return self.cli.watch(key, **kwargs)
 
     def lease(self, ttl: int, lease_id=None):
         """
@@ -233,7 +237,7 @@ class Client(Singleton):
         :returns: new lease
         :rtype: :class:`.Lease`
         """
-        return self._cli.lease(ttl, lease_id=lease_id)
+        return self.cli.lease(ttl, lease_id=lease_id)
 
     def revoke_lease(self, lease_id: int):
         """
@@ -250,7 +254,7 @@ class Client(Singleton):
             with self._lock:
                 del self._lease_info[lease_id]
 
-        return self._cli.revoke_lease(lease_id)
+        return self.cli.revoke_lease(lease_id)
 
     def refresh_lease(self, lease_id: int):
         """
@@ -260,7 +264,7 @@ class Client(Singleton):
         """
         logging.info(f'start refresh lease {lease_id}...')
 
-        response = self._cli.refresh_lease(lease_id)
+        response = self.cli.refresh_lease(lease_id)
         for resp in response:
             logging.debug(resp)
 
@@ -300,7 +304,7 @@ class Client(Singleton):
         :returns: new lock
         :rtype: :class:`.Lock`
         """
-        return self._cli.lock(name, ttl=ttl)
+        return self.cli.lock(name, ttl=ttl)
 
     def registration(self, ttlOptions: t.Optional[TTLOptions] = None):
         return Registration(cli=self, ttlOptions=ttlOptions)
@@ -317,7 +321,36 @@ def new_client(
 @implementer(lockx.ILock)
 class Lock:
     """etcd lock"""
-    # TODO: 实现ILock定义的接口
+    def __init__(
+            self,
+            name: str = None,
+            ttl: int = 60,
+            client: t.Optional[Client] = None
+    ):
+        self._name = name
+        self._ttl = ttl
+        self.etcd_cli = client
+        self._lock_cli = self.etcd_cli.cli.lock(self._name, self._ttl) if self._name else None
+
+    def init(self, name: str, ttl: int = 60):
+        self._name = name
+        self._ttl = ttl
+        self._lock_cli = self.etcd_cli.cli.lock(self._name, self._ttl)
+
+    def acquire(self) -> bool:
+        if not self._lock_cli:
+            raise ETCDLockNotInitException
+        return self.etcd_cli.lock(self._name, self._ttl).acquire()
+
+    def release(self):
+        if not self._lock_cli:
+            raise ETCDLockNotInitException
+        self._lock_cli.release()
+
+    def is_acquired(self) -> bool:
+        if not self._lock_cli:
+            raise ETCDLockNotInitException
+        return self._lock_cli.is_acquired()
 
 
 @implementer(registration.IRegistration)

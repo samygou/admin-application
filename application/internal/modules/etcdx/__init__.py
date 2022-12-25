@@ -8,9 +8,11 @@ __all__ = [
     'new_client',
     'cli',
     'EtcdConnType',
+    'Lock'
 ]
 
 Client = etcdx.Client
 new_client = etcdx.new_client
 cli: t.Optional[Client] = None
 EtcdConnType = etcdx.EtcdConnType
+Lock = etcdx.Lock

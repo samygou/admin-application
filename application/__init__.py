@@ -216,6 +216,7 @@ def _register_distributed_lock(app: FlaskX, pool: int = 10):
     lockx.lock_pool = lockx.LockPool(pool)
     for _ in range(pool):
         lockx.lock_pool.put(lockx.Lock(redisx.Lock(client=redisx.redis)))
+        # lockx.lock_pool.put(lockx.Lock(etcdx.Lock(client=etcdx.cli)))
 
 
 def _register_new_modules(app: FlaskX):
