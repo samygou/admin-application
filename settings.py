@@ -58,6 +58,10 @@ class Config:
         APP_HOST = '127.0.0.1:30003'
         OPTIONS = {'max_recv': 10 * 1024 * 1024}  # 配置options信息, 这里配置默认最大接收数据为10M
 
+    GRPC_HOST_SMS = '127.0.0.1:8002'
+
+    TOKEN_EXPIRED = 60 * 60 * 24
+
     @staticmethod
     def init_app(app):
         pass

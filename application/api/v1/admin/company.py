@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from application.internal.service.response import ResponseHandler
 from application.exception import ExceptionCode
+from .auth import login_required
 
 
 class ListCompaniesReq(BaseModel):
@@ -23,6 +24,8 @@ class ListCompaniesResp(BaseModel):
 
 class CompanyResource(views.MethodView):
     """company resource"""
+    decorators = (login_required, )
+
     def get(self):
         req = ListCompaniesReq(**request.args)
 

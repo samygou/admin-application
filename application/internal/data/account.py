@@ -28,6 +28,34 @@ class AccountRepo:
 
         return True
 
+    def get_account_by_uid(self, uid: str) -> t.Optional[biz.Account]:
+        """
+
+        :param uid:
+        :return:
+        """
+        account = Account.query.filter(Account.uid == uid).first()
+        if not account:
+            return None
+
+        account = biz.Account.from_orm(account)
+
+        return account
+
+    def get_account_by_phone(self, phone: str) -> t.Optional[biz.Account]:
+        """
+
+        :param phone:
+        :return:
+        """
+        account = Account.query.filter(Account.phone == phone).first()
+        if not account:
+            return None
+
+        account = biz.Account.from_orm(account)
+
+        return account
+
     def list_accounts(self, req: biz.ListAccountReq) -> t.List[biz.Account]:
         """
 

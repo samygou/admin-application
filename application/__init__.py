@@ -21,6 +21,7 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 from werkzeug.wrappers import Response
 from werkzeug.exceptions import InternalServerError
+import grpc
 
 import settings
 from application.exception import APIException, ExceptionCode
@@ -34,6 +35,7 @@ from application.internal.modules import logx
 from application.internal.modules import etcdx
 from application.internal.modules import registration
 from application.internal.modules import lockx
+from application.internal.modules.kit_pb_sms import pb_kit_sms_pb2_grpc
 
 
 class JSONResponse(Response):
@@ -219,6 +221,12 @@ def _register_distributed_lock(app: FlaskX, pool: int = 10):
         # lockx.lock_pool.put(lockx.Lock(etcdx.Lock(client=etcdx.cli)))
 
 
+def _register_grpc(app: FlaskX):
+    options = [('grpc.max_receive_message_length', 10 * 1024 * 1024)]
+    channel = grpc.insecure_channel(app.config['GRPC_HOST_SMS'], options=options)
+    app.sms_api = pb_kit_sms_pb2_grpc.APIStub(channel)
+
+
 def _register_new_modules(app: FlaskX):
     _register_server(app)
     _register_db(app)
@@ -229,6 +237,7 @@ def _register_new_modules(app: FlaskX):
     _register_etcd(app)
     _register_registration_center(app)
     _register_distributed_lock(app)
+    _register_grpc(app)
 
 
 class CreateAppX:

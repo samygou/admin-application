@@ -31,6 +31,9 @@ class IBackend(Interface):
         :return: token, login token
         """
 
+    def check_auth(self, token: str) -> bool:
+        """check auth interface"""
+
     def list_accounts(self, req: ListAccountReq) -> t.List[ListAccountResp]:
         """
 

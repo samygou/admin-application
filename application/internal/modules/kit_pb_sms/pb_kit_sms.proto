@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+
+option go_package = "git.aimall-tech.com/product/infra/api/pb/pb_kit_sm";
+
+//1.0.0
+package pb_kit_sm;
+
+enum Error{
+    OK                      = 0;
+    Fault                   = 1;
+    OutOfLimitControl       = 2;    //超过调用频率限制
+    SendFailUnknownReason   = 3;    //发送失败未知原因
+    InvalidCode             = 4;
+    InvalidToken            = 5;
+    TokenExpired            = 6;
+}
+
+//typ为以下几种
+//  signup    注册
+//  login     登录
+//  modify    更新
+message SendSMReq {
+    string              phone                   = 1;        //手机号
+    string              typ                     = 2;        //类型
+    int64               expired                 = 3;        //过期时间，默认5分钟
+}
+message SendSMResp {
+    Error               err                     = 1;
+    string              token                   = 2;        //短信句柄
+}
+
+message SendTemplateSMReq {
+    string                  phone                   = 1;        //手机号
+    string                  sign_name               = 2;        //签名，默认为：爱莫科技
+    string                  template_code           = 3;        //模板号
+    map<string, string>     template_params         = 4;        //模板参数
+}
+message SendTemplateSMResp {
+    Error               err                         = 1;
+}
+
+message CheckCodeReq {
+    string              phone                   = 1;
+    string              code                    = 2;        //验证码
+    string              token                   = 3;        //登录句柄
+}
+message CheckCodeResp {
+    Error               err                     = 1;
+}
+
+service API {
+    //发送验证码短信
+    rpc SendSM(SendSMReq)                       returns (SendSMResp)                {}
+    rpc CheckCode(CheckCodeReq)                 returns (CheckCodeResp)             {}
+
+    //发送模板短信
+    rpc SendTemplateSM(SendTemplateSMReq)       returns (SendTemplateSMResp)        {}
+}

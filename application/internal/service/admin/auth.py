@@ -20,3 +20,6 @@ class AuthService:
         ))
 
         return token
+
+    def check_auth(self, token: str) -> bool:
+        return self._account_use_case.check_auth(token)

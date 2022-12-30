@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from application.internal.service.response import ResponseHandler
 from application.exception import ExceptionCode
 from application.internal.modules import pagex
+from .auth import login_required
 
 
 class ListAccountReq(BaseModel):
@@ -24,6 +25,8 @@ class ListAccountResp(BaseModel):
 
 class AccountResource(views.MethodView):
     """account resource"""
+    decorators = (login_required, )
+
     def get(self):
         pl = request.args.get('pl').split(',', 1)
         page_limit = pagex.Pagex(offset=int(pl[0]), size=int(pl[1]))

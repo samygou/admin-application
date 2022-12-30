@@ -1,3 +1,5 @@
+from functools import wraps
+
 from flask import views, request, current_app
 from pydantic import BaseModel
 
@@ -14,6 +16,30 @@ class AuthLoginReq(BaseModel):
     phone: str
     sms_token: str
     code: str
+
+
+def login_required(func):
+    @wraps(func)
+    def verify_token(*args, **kwargs):
+        token = request.headers.get('Authorization')
+
+        if not token:
+            return ResponseHandler.process(
+                ExceptionCode.UNAUTH_CODE,
+                'auth_token_invalid',
+                'auth failed, no token'
+            )
+
+        if not current_app.r.b.check_auth(token):
+            return ResponseHandler.process(
+                ExceptionCode.UNAUTH_CODE,
+                'auth_token_invalid',
+                'auth token failed'
+            )
+
+        return func(*args, **kwargs)
+
+    return verify_token
 
 
 class AuthSendSmsResource(views.MethodView):
