@@ -4,6 +4,7 @@ from enum import Enum, unique
 import threading
 
 import etcd3
+from etcd3 import watch
 from pydantic import BaseModel
 from zope.interface import implementer
 
@@ -11,6 +12,7 @@ from application.internal.modules.utils import Singleton
 from application.internal.modules import apscheduler
 from application.internal.modules import registration
 from application.internal.modules import lockx
+from application.internal.modules import watchx
 
 
 @unique
@@ -212,7 +214,7 @@ class Client(Singleton):
         """
         Watch a range of keys with a prefix.
 
-        :param key: key to watch
+        :param key: key to watchx
 
         :param prefix_key: is prefix key or not
 
@@ -308,6 +310,9 @@ class Client(Singleton):
 
     def registration(self, ttlOptions: t.Optional[TTLOptions] = None):
         return Registration(cli=self, ttlOptions=ttlOptions)
+
+    def watcher(self):
+        return Watch(self)
 
 
 def new_client(
@@ -405,14 +410,84 @@ class Registration(Singleton):
                 del self.lease_info[key]
 
 
-class Watch:
-    """watch client"""
+@implementer(watchx.IWatchClient)
+class Watch(Singleton):
+    """watchx client"""
     def __init__(self, cli: Client):
         """init"""
-        self._cli = cli
+        self._etcd_cli = cli
+        self.registers = {}
+        self._lock = threading.Lock()
 
-    def watch(self, key: str, prefix_key: bool = False, **kwargs):
-        """"""
+    def watch_(self, key: str, prefix_key: bool = False, **kwargs):
+        """
 
-    def cancel(self):
-        """"""
+        :param key: watchx key
+        :param prefix_key: 是否是前缀
+        :param kwargs:
+        :return: events, iterator
+        """
+        if prefix_key:
+            return self._etcd_cli.cli.watch_prefix(key, **kwargs)
+
+        return self._etcd_cli.cli.watch(key, **kwargs)
+
+    def cancel(self, watch_id):
+        """
+
+        :param watch_id:
+        :return:
+        """
+        self._etcd_cli.cli.cancel_watch(watch_id)
+
+    def add_watch_callback(self, key: str, callback: t.Callable, prefix_key: bool = False, **kwargs):
+        """
+
+        :param key: watchx key
+        :param callback: 回调函数
+        :param prefix_key: 是否前缀watch
+        :param kwargs:
+        :return: watch_id
+        """
+        if prefix_key:
+            return self._etcd_cli.cli.add_watch_prefix_callback(key, callback, **kwargs)
+
+        return self._etcd_cli.cli.add_watch_callback(key, callback, **kwargs)
+
+    def watch_response(self, key: str, prefix_key: bool = False, **kwargs):
+        """
+
+        :param key: watchx key
+        :param prefix_key: 是否前缀watch
+        :param kwargs:
+        :return: WatchResponse, iterator
+        """
+        if prefix_key:
+            return self._etcd_cli.cli.watch_prefix_response(key, **kwargs)
+
+        return self._etcd_cli.cli.watch_response(key, **kwargs)
+
+    def register(self, key: str, callback: t.Callable):
+        """
+        注册watch key的回调函数, 使用内部字典记录
+        :param key: watchx key
+        :param callback: 回调函数
+        :return:
+        """
+        with self._lock:
+            self.registers[key] = callback
+
+    def global_callback(self, resp: watch.WatchResponse):
+        """
+        设置的全局回调函数
+        :param resp: watchx response
+        :return:
+        """
+        for event in resp.events:
+            key = event.key.decode('utf8')
+            keys = key.split('@', 1)
+            prefix_key = keys[0]
+            val = event.value.decode('utf8')
+            callback = self.registers.get(prefix_key)
+            if callback:
+                callback(key, val)

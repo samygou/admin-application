@@ -35,6 +35,7 @@ from application.internal.modules import logx
 from application.internal.modules import etcdx
 from application.internal.modules import registration
 from application.internal.modules import lockx
+from application.internal.modules import watchx
 from application.internal.modules.kit_pb_sms import pb_kit_sms_pb2_grpc
 
 
@@ -221,6 +222,20 @@ def _register_distributed_lock(app: FlaskX, pool: int = 10):
         # lockx.lock_pool.put(lockx.Lock(etcdx.Lock(client=etcdx.cli)))
 
 
+def _register_watch(app: FlaskX):
+    watchx.cli = watchx.new_client(etcdx.cli.watcher())
+    # 以下是test watch的功能, 有待完善
+    watch_id = watchx.cli.add_watch_callback(
+        'admin-application-test-watch-key',
+        watchx.cli.global_callback,
+        prefix_key=True
+    )
+    watchx.cli.register(
+        'admin-application-test-watch-key',
+        watchx.test_watch_callback
+    )
+
+
 def _register_grpc(app: FlaskX):
     options = [('grpc.max_receive_message_length', 10 * 1024 * 1024)]
     channel = grpc.insecure_channel(app.config['GRPC_HOST_SMS'], options=options)
@@ -237,6 +252,7 @@ def _register_new_modules(app: FlaskX):
     _register_etcd(app)
     _register_registration_center(app)
     _register_distributed_lock(app)
+    _register_watch(app)
     _register_grpc(app)
 
 
